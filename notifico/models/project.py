@@ -1,15 +1,19 @@
 # -*- coding: utf8 -*-
-__all__ = ('Project',)
+__all__ = (
+    'Project',
+)
 import datetime
 
 from sqlalchemy import or_
 from sqlalchemy.ext.hybrid import hybrid_property
 
-from notifico import db
+from notifico.server import db
 from notifico.models import CaseInsensitiveComparator
 
 
-class Project(db.Model):
+class ProjectModel(db.Model):
+    __tablename__ = 'project'
+
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), nullable=False)
     created = db.Column(db.TIMESTAMP(), default=datetime.datetime.utcnow)
@@ -17,7 +21,7 @@ class Project(db.Model):
     website = db.Column(db.String(1024))
 
     owner_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    owner = db.relationship('User', backref=db.backref(
+    owner = db.relationship('UserModel', backref=db.backref(
         'projects', order_by=id, lazy='dynamic', cascade='all, delete-orphan'
     ))
 
@@ -64,11 +68,11 @@ class Project(db.Model):
             # We only show the projects that are either public,
             # or are owned by `user`.
             q = q.filter(or_(
-                Project.owner_id == user.id,
-                Project.public == True
+                ProjectModel.owner_id == user.id,
+                ProjectModel.public == True
             ))
         else:
-            q = q.filter(Project.public == True)
+            q = q.filter(ProjectModel.public == True)
 
         return q
 

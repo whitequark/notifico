@@ -2,7 +2,7 @@
 from flask import g
 from flask.ext import wtf
 
-from notifico.models import User
+from notifico.models import UserModel
 from notifico.services import reset
 
 
@@ -31,7 +31,7 @@ class UserRegisterForm(wtf.Form):
         from notifico.views.account import _reserved
 
         username = field.data.strip().lower()
-        if username in _reserved or User.username_exists(username):
+        if username in _reserved or UserModel.username_exists(username):
             raise wtf.ValidationError(
                 'Sorry, but that username is taken.'
             )
@@ -46,7 +46,7 @@ class UserLoginForm(wtf.Form):
     ])
 
     def validate_password(form, field):
-        if not User.login(form.username.data, field.data):
+        if not UserModel.login(form.username.data, field.data):
             raise wtf.ValidationError('Incorrect username and/or password.')
 
 
@@ -62,7 +62,7 @@ class UserPasswordForm(wtf.Form):
     confirm = wtf.PasswordField('Confirm Password')
 
     def validate_old(form, field):
-        if not User.login(g.user.username, field.data):
+        if not UserModel.login(g.user.username, field.data):
             raise wtf.ValidationError('Old Password is incorrect.')
 
 
@@ -75,7 +75,7 @@ class UserDeleteForm(wtf.Form):
     confirm = wtf.PasswordField('Confirm Password')
 
     def validate_password(form, field):
-        if not User.login(g.user.username, field.data):
+        if not UserModel.login(g.user.username, field.data):
             raise wtf.ValidationError('Password is incorrect.')
 
 
@@ -85,7 +85,7 @@ class UserForgotForm(wtf.Form):
     ])
 
     def validate_username(form, field):
-        user = User.by_username(field.data)
+        user = UserModel.by_username(field.data)
         if not user:
             raise wtf.ValidationError('No such user exists.')
 

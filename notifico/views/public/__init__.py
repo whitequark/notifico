@@ -8,9 +8,9 @@ from flask import (
 from flask.ext.sqlalchemy import Pagination
 from sqlalchemy import func
 
-from notifico import db
+from notifico.server import db
 from notifico.services import stats
-from notifico.models import User, Channel, Project
+from notifico.models import UserModel, ChannelModel, ProjectModel
 from notifico.services.hooks import HookService
 
 public = Blueprint('public', __name__, template_folder='templates')
@@ -24,9 +24,9 @@ def landing():
     """
     # Find the 10 latest public projects.
     new_projects = (
-        Project.visible(Project.query, user=g.user)
+        ProjectModel.visible(ProjectModel.query, user=g.user)
         .order_by(False)
-        .order_by(Project.created.desc())
+        .order_by(ProjectModel.created.desc())
     ).paginate(1, 10, False)
 
     return render_template(
@@ -44,12 +44,12 @@ def networks():
     page = max(int(request.args.get('page', 1)), 1)
 
     q = (
-        Channel.visible(db.session.query(
-            Channel.host,
-            func.count(func.distinct(Channel.channel)).label('di_count'),
-            func.count(Channel.channel).label('count')
+        ChannelModel.visible(db.session.query(
+            ChannelModel.host,
+            func.count(func.distinct(ChannelModel.channel)).label('di_count'),
+            func.count(ChannelModel.channel).label('count')
         ), user=g.user)
-        .group_by(Channel.host)
+        .group_by(ChannelModel.host)
         .order_by('di_count desc')
     )
     total = q.count()
@@ -68,10 +68,10 @@ def network(network):
     per_page = min(int(request.args.get('l', 25)), 100)
     page = max(int(request.args.get('page', 1)), 1)
 
-    q = Channel.visible(
-        Channel.query.filter(Channel.host == network),
+    q = ChannelModel.visible(
+        ChannelModel.query.filter(ChannelModel.host == network),
         user=g.user
-    ).order_by(Channel.created.desc())
+    ).order_by(ChannelModel.created.desc())
 
     pagination = q.paginate(page, per_page, False)
 
@@ -89,11 +89,11 @@ def projects(page=1):
     per_page = min(int(request.args.get('l', 25)), 100)
     sort_by = request.args.get('s', 'created')
 
-    q = Project.visible(Project.query, user=g.user).order_by(False)
+    q = ProjectModel.visible(ProjectModel.query, user=g.user).order_by(False)
     q = q.order_by({
-        'created': Project.created.desc(),
-        'messages': Project.message_count.desc()
-    }.get(sort_by, Project.created.desc()))
+        'created': ProjectModel.created.desc(),
+        'messages': ProjectModel.message_count.desc()
+    }.get(sort_by, ProjectModel.created.desc()))
 
     pagination = q.paginate(page, per_page, False)
 
@@ -110,10 +110,10 @@ def users(page=1):
     per_page = min(int(request.args.get('l', 25)), 100)
     sort_by = request.args.get('s', 'created')
 
-    q = User.query.order_by(False)
+    q = UserModel.query.order_by(False)
     q = q.order_by({
-        'created': User.joined.desc()
-    }.get(sort_by, User.joined.desc()))
+        'created': UserModel.joined.desc()
+    }.get(sort_by, UserModel.joined.desc()))
 
     pagination = q.paginate(page, per_page, False)
 

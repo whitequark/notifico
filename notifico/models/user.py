@@ -1,5 +1,5 @@
 # -*- coding: utf8 -*-
-__all__ = ('User', 'Group')
+__all__ = ('UserModel', 'GroupModel')
 import os
 import base64
 import hashlib
@@ -7,11 +7,13 @@ import datetime
 
 from sqlalchemy.ext.hybrid import hybrid_property
 
-from notifico import db
+from notifico.server import db
 from notifico.models import CaseInsensitiveComparator
 
 
-class User(db.Model):
+class UserModel(db.Model):
+    __tablename__ = 'user'
+
     id = db.Column(db.Integer, primary_key=True)
 
     # ---
@@ -116,56 +118,18 @@ class User(db.Model):
             # We're already in this group.
             return
 
-        self.groups.append(Group.get_or_create(name=name))
-
-    def export(self):
-        """
-        Exports the user, his projects, and his hooks for use in a
-        private-ly hosted Notifico instance.
-        """
-        j = {
-            'user': {
-                'username': self.username,
-                'email': self.email,
-                'joined': self.joined.isoformat(),
-                'company': self.company,
-                'website': self.website,
-                'location': self.location
-            },
-            'projects': [{
-                'name': p.name,
-                'created': p.created.isoformat(),
-                'public': p.public,
-                'website': p.website,
-                'message_count': p.message_count,
-                'channels': [{
-                    'created': c.created.isoformat(),
-                    'channel': c.channel,
-                    'host': c.host,
-                    'port': c.port,
-                    'ssl': c.ssl,
-                    'public': c.public
-                } for c in p.channels],
-                'hooks': [{
-                    'created': h.created.isoformat(),
-                    'key': h.key,
-                    'service_id': h.service_id,
-                    'message_count': h.message_count,
-                    'config': h.config
-                } for h in p.hooks]
-            } for p in self.projects]
-        }
-
-        return j
+        self.groups.append(GroupModel.get_or_create(name=name))
 
 
-class Group(db.Model):
+class GroupModel(db.Model):
+    __tablename__ = 'group'
+
     id = db.Column(db.Integer, primary_key=True)
 
     name = db.Column(db.String(255), unique=True, nullable=False)
 
     owner_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    owner = db.relationship('User', backref=db.backref(
+    owner = db.relationship('UserModel', backref=db.backref(
         'groups', order_by=id, lazy='joined'
     ))
 
@@ -181,6 +145,6 @@ class Group(db.Model):
 
         g = cls.query.filter_by(name=name).first()
         if not g:
-            g = Group(name=name)
+            g = GroupModel(name=name)
 
         return g

@@ -6,7 +6,7 @@ from flask import url_for, request, abort
 from flask.ext import wtf
 from flask.ext.xmlrpc import XMLRPCHandler
 
-from notifico import db
+from notifico.server import db
 from notifico.services.hooks import HookService
 
 

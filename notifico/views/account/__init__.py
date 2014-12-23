@@ -14,8 +14,8 @@ from flask import (
     request,
     flash
 )
-from notifico import db, user_required
-from notifico.models import User, AuthToken
+from notifico.server import db, user_required
+from notifico.models import UserModel, AuthTokenModel
 from notifico.services import reset, background
 from notifico.views.account.forms import (
     UserLoginForm,
@@ -36,7 +36,7 @@ _reserved = ('new',)
 def set_user():
     g.user = None
     if '_u' in session and '_uu' in session:
-        g.user = User.query.filter_by(
+        g.user = UserModel.query.filter_by(
             id=session['_u'],
             username=session['_uu']
         ).first()
@@ -52,7 +52,7 @@ def login():
 
     form = UserLoginForm()
     if form.validate_on_submit():
-        u = User.by_username(form.username.data)
+        u = UserModel.by_username(form.username.data)
         session['_u'] = u.id
         session['_uu'] = u.username
         return redirect(url_for('projects.dashboard', u=u.username))
@@ -98,7 +98,7 @@ def forgot_password():
 
     form = UserForgotForm()
     if form.validate_on_submit():
-        user = User.by_username(form.username.data)
+        user = UserModel.by_username(form.username.data)
         new_token = reset.add_token(user, expire=token_expiry)
 
         # Send the email as a background job so we don't block
@@ -139,7 +139,7 @@ def reset_password():
     token = request.args.get('token')
     uid = request.args.get('uid')
 
-    u = User.query.get(int(uid))
+    u = UserModel.query.get(int(uid))
     if not u or not reset.valid_token(u, token):
         flash('Your reset request is invalid or expired.', category='warning')
         return redirect(url_for('.login'))
@@ -158,7 +158,7 @@ def reset_pick_password():
     if not token or not user_id:
         return redirect(url_for('.login'))
 
-    u = User.query.get(int(user_id))
+    u = UserModel.query.get(int(user_id))
     if not u or not reset.valid_token(u, token):
         flash(
             'Your reset request is invalid or expired.',
@@ -205,7 +205,11 @@ def register():
     form = UserRegisterForm()
     if form.validate_on_submit():
         # Checks out, go ahead and create our new user.
-        u = User.new(form.username.data, form.email.data, form.password.data)
+        u = UserModel.new(
+            form.username.data,
+            form.email.data,
+            form.password.data
+        )
         db.session.add(u)
         db.session.commit()
         # ... and send them back to the login screen.
@@ -274,7 +278,7 @@ def tokens(tid=None):
     Allows the user to view their OAuth tokens stored with Notifico.
     """
     if tid is not None:
-        t = AuthToken.query.get(tid)
+        t = AuthTokenModel.query.get(tid)
         if t is None:
             # The token no longer exists.
             return abort(404)

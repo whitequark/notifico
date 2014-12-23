@@ -1,14 +1,18 @@
 # -*- coding: utf8 -*-
-__all__ = ('Hook',)
+__all__ = (
+    'HookModel',
+)
 import os
 import base64
 import datetime
 
-from notifico import db
+from notifico.server import db
 from notifico.services.hooks import HookService
 
 
-class Hook(db.Model):
+class HookModel(db.Model):
+    __tablename__ = 'hook'
+
     id = db.Column(db.Integer, primary_key=True)
     created = db.Column(db.TIMESTAMP(), default=datetime.datetime.utcnow)
     key = db.Column(db.String(255), nullable=False)
@@ -16,7 +20,7 @@ class Hook(db.Model):
     config = db.Column(db.PickleType)
 
     project_id = db.Column(db.Integer, db.ForeignKey('project.id'))
-    project = db.relationship('Project', backref=db.backref(
+    project = db.relationship('ProjectModel', backref=db.backref(
         'hooks', order_by=id, lazy='dynamic', cascade='all, delete-orphan'
     ))
 

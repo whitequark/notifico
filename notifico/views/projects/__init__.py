@@ -17,8 +17,8 @@ from flask import (
 )
 from flask.ext import wtf
 
-from notifico import db, user_required
-from notifico.models import User, Project, Hook, Channel
+from notifico.server import db, user_required
+from notifico.models import UserModel, ProjectModel, HookModel, ChannelModel
 from notifico.services.hooks import HookService
 
 projects = Blueprint('projects', __name__, template_folder='templates')
@@ -54,7 +54,7 @@ class PasswordConfirmForm(wtf.Form):
     ])
 
     def validate_password(form, field):
-        if not User.login(g.user.username, field.data):
+        if not UserModel.login(g.user.username, field.data):
             raise wtf.ValidationError('Your password is incorrect.')
 
 
@@ -85,12 +85,12 @@ def project_action(f):
     """
     @wraps(f)
     def _wrapped(*args, **kwargs):
-        u = User.by_username(kwargs.pop('u'))
+        u = UserModel.by_username(kwargs.pop('u'))
         if not u:
             # No such user exists.
             return abort(404)
 
-        p = Project.by_name_and_owner(kwargs.pop('p'), u)
+        p = ProjectModel.by_name_and_owner(kwargs.pop('p'), u)
         if not p:
             # Project doesn't exist (404 Not Found)
             return abort(404)
@@ -108,7 +108,7 @@ def dashboard(u):
     Display an overview of all the user's projects with summary
     statistics.
     """
-    u = User.by_username(u)
+    u = UserModel.by_username(u)
     if not u:
         # No such user exists.
         return abort(404)
@@ -119,14 +119,15 @@ def dashboard(u):
     projects = (
         u.projects
         .order_by(False)
-        .order_by(Project.created.desc())
+        .order_by(ProjectModel.created.desc())
     )
     if not is_owner:
         # If this isn't the users own page, only
         # display public projects.
         projects = projects.filter_by(public=True)
 
-    return render_template('dashboard.html',
+    return render_template(
+        'dashboard.html',
         user=u,
         is_owner=is_owner,
         projects=projects,
@@ -144,13 +145,13 @@ def new():
     """
     form = ProjectDetailsForm()
     if form.validate_on_submit():
-        p = Project.by_name_and_owner(form.name.data, g.user)
+        p = ProjectModel.by_name_and_owner(form.name.data, g.user)
         if p:
             form.name.errors = [
                 wtf.ValidationError('Project name must be unique.')
             ]
         else:
-            p = Project.new(
+            p = ProjectModel.new(
                 form.name.data,
                 public=form.public.data,
                 website=form.website.data
@@ -161,7 +162,7 @@ def new():
 
             if p.public:
                 # New public projects get added to #commits by default.
-                c = Channel.new(
+                c = ChannelModel.new(
                     '#commits',
                     'chat.freenode.net',
                     6667,
@@ -191,7 +192,7 @@ def edit_project(u, p):
 
     form = ProjectDetailsForm(obj=p)
     if form.validate_on_submit():
-        old_p = Project.by_name_and_owner(form.name.data, g.user)
+        old_p = ProjectModel.by_name_and_owner(form.name.data, g.user)
         if old_p and old_p.id != p.id:
             form.name.errors = [
                 wtf.ValidationError('Project name must be unique.')
@@ -204,7 +205,8 @@ def edit_project(u, p):
             db.session.commit()
             return redirect(url_for('.dashboard', u=u.username))
 
-    return render_template('edit_project.html',
+    return render_template(
+        'edit_project.html',
         project=p,
         form=form
     )
@@ -275,19 +277,20 @@ def new_hook(u, p, sid):
         form = form()
 
     if form and hook.validate(form, request):
-        h = Hook.new(sid, config=hook.pack_form(form))
+        h = HookModel.new(sid, config=hook.pack_form(form))
         p.hooks.append(h)
         db.session.add(h)
         db.session.commit()
         return redirect(url_for('.details', p=p.name, u=u.username))
     elif form is None and request.method == 'POST':
-        h = Hook.new(sid)
+        h = HookModel.new(sid)
         p.hooks.append(h)
         db.session.add(h)
         db.session.commit()
         return redirect(url_for('.details', p=p.name, u=u.username))
 
-    return render_template('new_hook.html',
+    return render_template(
+        'new_hook.html',
         project=p,
         services=HookService.services,
         service=hook,
@@ -302,7 +305,7 @@ def edit_hook(u, p, hid):
     if p.owner.id != g.user.id:
         return abort(403)
 
-    h = Hook.query.get(hid)
+    h = HookModel.query.get(hid)
     if h is None:
         # You can't edit a hook that doesn't exist!
         return abort(404)
@@ -328,7 +331,8 @@ def edit_hook(u, p, hid):
     elif form:
         hook_service.load_form(form, h.config)
 
-    return render_template('edit_hook.html',
+    return render_template(
+        'edit_hook.html',
         project=p,
         services=HookService.services,
         service=hook_service,
@@ -338,7 +342,7 @@ def edit_hook(u, p, hid):
 
 @projects.route('/h/<int:pid>/<key>', methods=['GET', 'POST'])
 def hook_receive(pid, key):
-    h = Hook.query.filter_by(key=key, project_id=pid).first()
+    h = HookModel.query.filter_by(key=key, project_id=pid).first()
     if not h or not h.project:
         # The hook being pushed to doesn't exist, has been deleted,
         # or is a leftover from a project cull (which destroyed the project
@@ -346,12 +350,12 @@ def hook_receive(pid, key):
         return abort(404)
 
     # Increment the hooks message_count....
-    Hook.query.filter_by(id=h.id).update({
-        Hook.message_count: Hook.message_count + 1
+    HookModel.query.filter_by(id=h.id).update({
+        HookModel.message_count: HookModel.message_count + 1
     })
     # ... and the project-wide message_count.
-    Project.query.filter_by(id=h.project.id).update({
-        Project.message_count: Project.message_count + 1
+    ProjectModel.query.filter_by(id=h.project.id).update({
+        ProjectModel.message_count: ProjectModel.message_count + 1
     })
 
     hook = HookService.services.get(h.service_id)
@@ -372,7 +376,7 @@ def delete_hook(u, p, hid):
     """
     Delete an existing service hook.
     """
-    h = Hook.query.get(hid)
+    h = HookModel.query.get(hid)
     if not h:
         # Project doesn't exist (404 Not Found)
         return abort(404)
@@ -388,7 +392,8 @@ def delete_hook(u, p, hid):
         db.session.commit()
         return redirect(url_for('.details', p=p.name, u=u.username))
 
-    return render_template('delete_hook.html',
+    return render_template(
+        'delete_hook.html',
         project=p,
         hook=h
     )
@@ -409,13 +414,13 @@ def new_channel(u, p):
         channel = form.channel.data.strip().lower()
 
         # Make sure this isn't a duplicate channel before we create it.
-        c = Channel.query.filter_by(
+        c = ChannelModel.query.filter_by(
             host=host,
             channel=channel,
             project_id=p.id
         ).first()
         if not c:
-            c = Channel.new(
+            c = ChannelModel.new(
                 channel,
                 host,
                 port=form.port.data,
@@ -431,7 +436,8 @@ def new_channel(u, p):
                 'You cannot have a project in the same channel twice.'
             )]
 
-    return render_template('new_channel.html',
+    return render_template(
+        'new_channel.html',
         project=p,
         form=form
     )
@@ -444,7 +450,7 @@ def delete_channel(u, p, cid):
     """
     Delete an existing service hook.
     """
-    c = Channel.query.filter_by(
+    c = ChannelModel.query.filter_by(
         id=cid,
         project_id=p.id
     ).first()
@@ -464,7 +470,8 @@ def delete_channel(u, p, cid):
         db.session.commit()
         return redirect(url_for('.details', p=p.name, u=u.username))
 
-    return render_template('delete_channel.html',
+    return render_template(
+        'delete_channel.html',
         project=c.project,
         channel=c
     )

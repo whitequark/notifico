@@ -1,14 +1,17 @@
 # -*- coding: utf8 -*-
-__all__ = ('Channel',)
+__all__ = (
+    'ChannelModel',
+)
 import datetime
 
 from sqlalchemy import func
 
-from notifico import db
-from notifico.models.bot import BotEvent
+from notifico.server import db
 
 
-class Channel(db.Model):
+class ChannelModel(db.Model):
+    __tablename__ = 'channel'
+
     id = db.Column(db.Integer, primary_key=True)
     created = db.Column(db.TIMESTAMP(), default=datetime.datetime.utcnow)
 
@@ -19,7 +22,7 @@ class Channel(db.Model):
     public = db.Column(db.Boolean, default=False)
 
     project_id = db.Column(db.Integer, db.ForeignKey('project.id'))
-    project = db.relationship('Project', backref=db.backref(
+    project = db.relationship('ProjectModel', backref=db.backref(
         'channels', order_by=id, lazy='dynamic', cascade='all, delete-orphan'
     ))
 
@@ -37,25 +40,15 @@ class Channel(db.Model):
     def channel_count_by_network(cls):
         q = (
             db.session.query(
-                Channel.host, func.count(Channel.channel).label('count')
+                ChannelModel.host,
+                func.count(ChannelModel.channel).label('count')
             )
             .filter_by(public=True)
-            .group_by(Channel.host)
+            .group_by(ChannelModel.host)
             .order_by('-count')
         )
         for network, channel_count in q:
             yield network, channel_count
-
-    def last_event(self):
-        """
-        Returns the latest BotEvent to occur for this channel.
-        """
-        return BotEvent.query.filter_by(
-            host=self.host,
-            port=self.port,
-            ssl=self.ssl,
-            channel=self.channel
-        ).order_by(BotEvent.created.desc()).first()
 
     @classmethod
     def visible(cls, q, user=None):
@@ -71,9 +64,9 @@ class Channel(db.Model):
             # who should have full visibility.
             pass
         else:
-            q = q.join(Channel.project).filter(
+            q = q.join(ChannelModel.project).filter(
                 Project.public == True,
-                Channel.public == True
+                ChannelModel.public == True
             )
 
         return q

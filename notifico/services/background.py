@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from flask.ext.mail import Message
 
-from notifico import create_instance, celery, mail
+from notifico.server import celery, mail
 
 
 @celery.task
@@ -11,7 +11,5 @@ def send_mail(*args, **kwargs):
     settings.
     """
     # TODO: Allow bulk sending using flask.mail.Connection.
-    celery_app = create_instance()
-    with celery_app.app_context():
-        m = Message(*args, **kwargs)
-        mail.send(m)
+    m = Message(*args, **kwargs)
+    mail.send(m)

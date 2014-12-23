@@ -4,8 +4,8 @@ A collection of utility methods for common site statistics.
 """
 from sqlalchemy import func
 
-from notifico import db, cache
-from notifico.models import Project, Channel, User
+from notifico.server import db, cache
+from notifico.models import ProjectModel, ChannelModel, UserModel
 
 
 @cache.memoize(timeout=60 * 5)
@@ -14,28 +14,28 @@ def total_messages(user=None):
     Sum the total number of messages across all projects.
     """
     q = db.session.query(
-        func.sum(Project.message_count)
+        func.sum(ProjectModel.message_count)
     )
     if user:
-        q = q.filter(Project.owner_id == user.id)
+        q = q.filter(ProjectModel.owner_id == user.id)
 
     return q.scalar() or 0
 
 
 @cache.memoize(timeout=60 * 5)
 def total_users():
-    return User.query.count()
+    return UserModel.query.count()
 
 
 @cache.memoize(timeout=60 * 5)
 def total_projects():
-    return Project.query.count()
+    return ProjectModel.query.count()
 
 
 @cache.memoize(timeout=60 * 5)
 def total_networks():
     return db.session.query(
-        func.count(func.distinct(Channel.host)).label('count')
+        func.count(func.distinct(ChannelModel.host)).label('count')
     ).scalar()
 
 
@@ -43,14 +43,14 @@ def total_networks():
 def top_networks(limit=20):
     return (
         db.session.query(
-            Channel.host,
-            func.count(func.distinct(Channel.channel)).label('count'),
+            ChannelModel.host,
+            func.count(func.distinct(ChannelModel.channel)).label('count'),
         )
-        .join(Channel.project).filter(
-            Project.public == True,
-            Channel.public == True
+        .join(ChannelModel.project).filter(
+            ProjectModel.public == True,
+            ChannelModel.public == True
         )
-        .group_by(Channel.host)
+        .group_by(ChannelModel.host)
         .order_by('count desc')
         .limit(limit)
     ).all()

@@ -12,15 +12,23 @@ from flask import (
 from flask.ext.cache import Cache
 from flask.ext.mail import Mail
 from flask.ext.sqlalchemy import SQLAlchemy
+from flask.ext.debugtoolbar import DebugToolbarExtension
 from raven.contrib.flask import Sentry
 
 from notifico.util import pretty
 
+#: An instance of the Flask-SQLAlchemy extension.
 db = SQLAlchemy()
+#: An instance of GetSentry's Raven.
 sentry = Sentry()
+#: An instance of the Flask-Cache extension.
 cache = Cache()
+#: An instance of the Flask-Mail extension.
 mail = Mail()
+#: An instance of Celery.
 celery = Celery()
+#: An instance of the Flask-DebugToolbar extension.
+toolbar = DebugToolbarExtension()
 
 
 def user_required(f):
@@ -82,15 +90,13 @@ def create_app():
         }
     })
 
-    # Attach Flask-Mail to our application instance.
     mail.init_app(app)
-    # Attach Flask-SQLAlchemy to our application instance.
     db.init_app(app)
+    toolbar.init_app(app)
 
     # Update celery's configuration with our application config.
     celery.config_from_object(app.config)
 
-    # Import and register all of our blueprints.
     from notifico.views.account import account
     from notifico.views.public import public
     from notifico.views.projects import projects

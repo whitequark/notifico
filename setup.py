@@ -23,6 +23,7 @@ if __name__ == '__main__':
             'Flask-XML-RPC',
             'Flask-Mail',
             'Flask-Cache',
+            'Flask-debugtoolbar',
             'fabric',
             'sqlalchemy',
             'UtopiaIRC',

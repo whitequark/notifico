@@ -6,6 +6,7 @@ import datetime
 # This key MUST be changed before you make a site public, as it is used
 # to sign the secure cookies used for sessions.
 SECRET_KEY = 'YouReallyShouldChangeThisYouKnow'
+DEBUG = True
 
 ###
 # SQLAlchemy configuration.

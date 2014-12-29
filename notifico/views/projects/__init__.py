@@ -9,15 +9,15 @@ from functools import wraps
 from flask import (
     Blueprint,
     render_template,
-    g,
     redirect,
     url_for,
     abort,
     request
 )
 from flask.ext import wtf
+from flask.ext.login import current_user, login_required
 
-from notifico.server import db, user_required
+from notifico.server import db
 from notifico.models import UserModel, ProjectModel, HookModel, ChannelModel
 from notifico.services.hooks import HookService
 
@@ -54,7 +54,7 @@ class PasswordConfirmForm(wtf.Form):
     ])
 
     def validate_password(form, field):
-        if not UserModel.login(g.user.username, field.data):
+        if not UserModel.login(current_user.username, field.data):
             raise wtf.ValidationError('Your password is incorrect.')
 
 
@@ -113,7 +113,7 @@ def dashboard(u):
         # No such user exists.
         return abort(404)
 
-    is_owner = (g.user and g.user.id == u.id)
+    is_owner = (current_user and current_user.id == u.id)
 
     # Get all projects by decending creation date.
     projects = (
@@ -138,14 +138,14 @@ def dashboard(u):
 
 
 @projects.route('/new', methods=['GET', 'POST'])
-@user_required
+@login_required
 def new():
     """
     Create a new project.
     """
     form = ProjectDetailsForm()
     if form.validate_on_submit():
-        p = ProjectModel.by_name_and_owner(form.name.data, g.user)
+        p = ProjectModel.by_name_and_owner(form.name.data, current_user)
         if p:
             form.name.errors = [
                 wtf.ValidationError('Project name must be unique.')
@@ -156,8 +156,8 @@ def new():
                 public=form.public.data,
                 website=form.website.data
             )
-            p.full_name = '{0}/{1}'.format(g.user.username, p.name)
-            g.user.projects.append(p)
+            p.full_name = '{0}/{1}'.format(current_user.username, p.name)
+            current_user.projects.append(p)
             db.session.add(p)
 
             if p.public:
@@ -173,26 +173,28 @@ def new():
 
             db.session.commit()
 
-            return redirect(url_for('.details', u=g.user.username, p=p.name))
+            return redirect(
+                url_for('.details', u=current_user.username, p=p.name)
+            )
 
     return render_template('new_project.html', form=form)
 
 
 @projects.route('/<u>/<p>/edit', methods=['GET', 'POST'])
-@user_required
+@login_required
 @project_action
 def edit_project(u, p):
     """
     Edit an existing project.
     """
-    if p.owner.id != g.user.id:
+    if p.owner.id != current_user.id:
         # Project isn't public and the viewer isn't the project owner.
         # (403 Forbidden)
         return abort(403)
 
     form = ProjectDetailsForm(obj=p)
     if form.validate_on_submit():
-        old_p = ProjectModel.by_name_and_owner(form.name.data, g.user)
+        old_p = ProjectModel.by_name_and_owner(form.name.data, current_user)
         if old_p and old_p.id != p.id:
             form.name.errors = [
                 wtf.ValidationError('Project name must be unique.')
@@ -201,7 +203,7 @@ def edit_project(u, p):
             p.name = form.name.data
             p.website = form.website.data
             p.public = form.public.data
-            p.full_name = '{0}/{1}'.format(g.user.username, p.name)
+            p.full_name = '{0}/{1}'.format(current_user.username, p.name)
             db.session.commit()
             return redirect(url_for('.dashboard', u=u.username))
 
@@ -213,13 +215,13 @@ def edit_project(u, p):
 
 
 @projects.route('/<u>/<p>/delete', methods=['GET', 'POST'])
-@user_required
+@login_required
 @project_action
 def delete_project(u, p):
     """
     Delete an existing project.
     """
-    if p.owner.id != g.user.id:
+    if p.owner.id != current_user.id:
         # Project isn't public and the viewer isn't the project owner.
         # (403 Forbidden)
         return abort(403)
@@ -238,10 +240,10 @@ def details(u, p):
     """
     Show the details for an existing project.
     """
-    if not p.can_see(g.user):
+    if not p.can_see(current_user):
         return redirect(url_for('public.landing'))
 
-    can_modify = p.can_modify(g.user)
+    can_modify = p.can_modify(current_user)
 
     visible_channels = p.channels
     if not can_modify:
@@ -263,10 +265,10 @@ def details(u, p):
 @projects.route('/<u>/<p>/hook/new', defaults={'sid': 10}, methods=[
     'GET', 'POST'])
 @projects.route('/<u>/<p>/hook/new/<int:sid>', methods=['GET', 'POST'])
-@user_required
+@login_required
 @project_action
 def new_hook(u, p, sid):
-    if p.owner.id != g.user.id:
+    if p.owner.id != current_user.id:
         # Project isn't public and the viewer isn't the project owner.
         # (403 Forbidden)
         return abort(403)
@@ -299,10 +301,10 @@ def new_hook(u, p, sid):
 
 
 @projects.route('/<u>/<p>/hook/edit/<int:hid>', methods=['GET', 'POST'])
-@user_required
+@login_required
 @project_action
 def edit_hook(u, p, hid):
-    if p.owner.id != g.user.id:
+    if p.owner.id != current_user.id:
         return abort(403)
 
     h = HookModel.query.get(hid)
@@ -310,7 +312,7 @@ def edit_hook(u, p, hid):
         # You can't edit a hook that doesn't exist!
         return abort(404)
 
-    if h.project.owner.id != g.user.id:
+    if h.project.owner.id != current_user.id:
         # You can't edit a hook that isn't yours!
         return abort(403)
 
@@ -370,7 +372,7 @@ def hook_receive(pid, key):
 
 
 @projects.route('/<u>/<p>/hook/delete/<int:hid>', methods=['GET', 'POST'])
-@user_required
+@login_required
 @project_action
 def delete_hook(u, p, hid):
     """
@@ -381,7 +383,7 @@ def delete_hook(u, p, hid):
         # Project doesn't exist (404 Not Found)
         return abort(404)
 
-    if p.owner.id != g.user.id or h.project.id != p.id:
+    if p.owner.id != current_user.id or h.project.id != p.id:
         # Project isn't public and the viewer isn't the project owner.
         # (403 Forbidden)
         return abort(403)
@@ -400,10 +402,10 @@ def delete_hook(u, p, hid):
 
 
 @projects.route('/<u>/<p>/channel/new', methods=['GET', 'POST'])
-@user_required
+@login_required
 @project_action
 def new_channel(u, p):
-    if p.owner.id != g.user.id:
+    if p.owner.id != current_user.id:
         # Project isn't public and the viewer isn't the project owner.
         # (403 Forbidden)
         return abort(403)
@@ -444,7 +446,7 @@ def new_channel(u, p):
 
 
 @projects.route('/<u>/<p>/channel/delete/<int:cid>', methods=['GET', 'POST'])
-@user_required
+@login_required
 @project_action
 def delete_channel(u, p, cid):
     """
@@ -459,7 +461,7 @@ def delete_channel(u, p, cid):
         # Project or channel doesn't exist (404 Not Found)
         return abort(404)
 
-    if c.project.owner.id != g.user.id or c.project.id != p.id:
+    if c.project.owner.id != current_user.id or c.project.id != p.id:
         # Project isn't public and the viewer isn't the project owner.
         # (403 Forbidden)
         return abort(403)

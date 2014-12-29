@@ -5,13 +5,15 @@ import base64
 import hashlib
 import datetime
 
+from werkzeug import security
+from flask.ext.login import UserMixin
 from sqlalchemy.ext.hybrid import hybrid_property
 
 from notifico.server import db
 from notifico.models import CaseInsensitiveComparator
 
 
-class UserModel(db.Model):
+class UserModel(db.Model, UserMixin):
     __tablename__ = 'user'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -59,49 +61,6 @@ class UserModel(db.Model):
         self.salt = self._create_salt()
         self.password = self._hash_password(new_password, self.salt)
 
-    @classmethod
-    def by_email(cls, email):
-        return cls.query.filter_by(email=email.lower().strip()).first()
-
-    @classmethod
-    def by_username(cls, username):
-        return cls.query.filter_by(username_i=username).first()
-
-    @classmethod
-    def email_exists(cls, email):
-        return cls.query.filter_by(email=email.lower().strip()).count() >= 1
-
-    @classmethod
-    def username_exists(cls, username):
-        return cls.query.filter_by(username_i=username).count() >= 1
-
-    @classmethod
-    def login(cls, username, password):
-        """
-        Returns a `User` object for which `username` and `password` are
-        correct, otherwise ``None``.
-        """
-        u = cls.by_username(username)
-        if u and u.password == cls._hash_password(password, u.salt):
-            return u
-        return None
-
-    @hybrid_property
-    def username_i(self):
-        return self.username.lower()
-
-    @username_i.comparator
-    def username_i(cls):
-        return CaseInsensitiveComparator(cls.username)
-
-    def active_projects(self, limit=5):
-        """
-        Return this users most active projets (by descending message count).
-        """
-        q = self.projects.order_by(False).order_by('-message_count')
-        q = q.limit(limit)
-        return q
-
     def in_group(self, name):
         """
         Returns ``True`` if this user is in the group `name`, otherwise
@@ -119,6 +78,40 @@ class UserModel(db.Model):
             return
 
         self.groups.append(GroupModel.get_or_create(name=name))
+
+    def __repr__(self):
+        return u'<User {u.username}>'.format(u=self)
+
+    @hybrid_property
+    def username_i(self):
+        return self.username.lower()
+
+    @username_i.comparator
+    def username_i(cls):
+        return CaseInsensitiveComparator(cls.username)
+
+    @classmethod
+    def by_username(cls, username):
+        """
+        Lookup a user by their username (case insensitive).
+
+        :rtype: :class:`UserModel` or `None`.
+        """
+        return cls.query.filter(cls.username_i == username).first()
+
+    def check_password(self, password):
+        """
+        Compare `password` to the hashed and salted password for this user.
+
+        :returns: `True` or `False`.
+        :rtype: bool
+        """
+        if self.salt is not None:
+            # A legacy password.
+            return self._hash_password(password, self.salt) == self.password
+
+        # A modern password.
+        return security.check_password_hash(self.password, password)
 
 
 class GroupModel(db.Model):

@@ -2,9 +2,9 @@
 from flask import (
     Blueprint,
     render_template,
-    g,
     request
 )
+from flask.ext.login import current_user
 from flask.ext.sqlalchemy import Pagination
 from sqlalchemy import func
 
@@ -18,20 +18,9 @@ public = Blueprint('public', __name__, template_folder='templates')
 
 @public.route('/')
 def landing():
-    """
-    Show a landing page giving a short intro blurb to unregistered users
-    and very basic metrics such as total users.
-    """
-    # Find the 10 latest public projects.
-    new_projects = (
-        ProjectModel.visible(ProjectModel.query, user=g.user)
-        .order_by(False)
-        .order_by(ProjectModel.created.desc())
-    ).paginate(1, 10, False)
-
     return render_template(
         'landing.html',
-        new_projects=new_projects,
+        new_projects=[],
         top_networks=stats.top_networks(limit=10),
         total_networks=stats.total_networks(),
         total_users=stats.total_users()
@@ -48,7 +37,7 @@ def networks():
             ChannelModel.host,
             func.count(func.distinct(ChannelModel.channel)).label('di_count'),
             func.count(ChannelModel.channel).label('count')
-        ), user=g.user)
+        ), user=current_user)
         .group_by(ChannelModel.host)
         .order_by('di_count desc')
     )
@@ -70,7 +59,7 @@ def network(network):
 
     q = ChannelModel.visible(
         ChannelModel.query.filter(ChannelModel.host == network),
-        user=g.user
+        user=current_user
     ).order_by(ChannelModel.created.desc())
 
     pagination = q.paginate(page, per_page, False)
@@ -89,7 +78,10 @@ def projects(page=1):
     per_page = min(int(request.args.get('l', 25)), 100)
     sort_by = request.args.get('s', 'created')
 
-    q = ProjectModel.visible(ProjectModel.query, user=g.user).order_by(False)
+    q = ProjectModel.visible(
+        ProjectModel.query,
+        user=current_user
+    ).order_by(False)
     q = q.order_by({
         'created': ProjectModel.created.desc(),
         'messages': ProjectModel.message_count.desc()

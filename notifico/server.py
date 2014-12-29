@@ -11,6 +11,7 @@ from flask import (
 )
 from flask.ext.cache import Cache
 from flask.ext.mail import Mail
+from flask.ext.login import LoginManager
 from flask.ext.sqlalchemy import SQLAlchemy
 from flask.ext.debugtoolbar import DebugToolbarExtension
 from raven.contrib.flask import Sentry
@@ -30,17 +31,15 @@ celery = Celery()
 #: An instance of the Flask-DebugToolbar extension.
 toolbar = DebugToolbarExtension()
 
+login_manager = LoginManager()
+login_manager.login_view = 'user.login_view'
+login_manager.login_message_category = 'info'
 
-def user_required(f):
-    """
-    A decorator for views which required a logged in user.
-    """
-    @wraps(f)
-    def _wrapped(*args, **kwargs):
-        if g.user is None:
-            return redirect(url_for('account.login'))
-        return f(*args, **kwargs)
-    return _wrapped
+
+@login_manager.user_loader
+def load_user(user_identifier):
+    from notifico.models.user import UserModel
+    return UserModel.query.get(user_identifier)
 
 
 def group_required(name):
@@ -93,6 +92,7 @@ def create_app():
     mail.init_app(app)
     db.init_app(app)
     toolbar.init_app(app)
+    login_manager.init_app(app)
 
     # Update celery's configuration with our application config.
     celery.config_from_object(app.config)

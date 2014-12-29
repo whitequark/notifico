@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-from flask import g
 from flask.ext import wtf
+from flask.ext.login import current_user
 
 from notifico.models import UserModel
 from notifico.services import reset
@@ -44,10 +44,11 @@ class UserLoginForm(wtf.Form):
     password = wtf.PasswordField('Password', validators=[
         wtf.Required()
     ])
-
-    def validate_password(form, field):
-        if not UserModel.login(form.username.data, field.data):
-            raise wtf.ValidationError('Incorrect username and/or password.')
+    remember_me = wtf.BooleanField('remember me', description=(
+        # TODO: Is there a clean way of doing this dynamically based on
+        # the timedelta stored in REMEMBER_COOKIE_DURATION?
+        'Remember me on this computer for 30 days.'
+    ))
 
 
 class UserPasswordForm(wtf.Form):
@@ -62,7 +63,7 @@ class UserPasswordForm(wtf.Form):
     confirm = wtf.PasswordField('Confirm Password')
 
     def validate_old(form, field):
-        if not UserModel.login(g.user.username, field.data):
+        if not current_user.check_password(field.data):
             raise wtf.ValidationError('Old Password is incorrect.')
 
 
@@ -75,7 +76,7 @@ class UserDeleteForm(wtf.Form):
     confirm = wtf.PasswordField('Confirm Password')
 
     def validate_password(form, field):
-        if not UserModel.login(g.user.username, field.data):
+        if not UserModel.login(current_user.username, field.data):
             raise wtf.ValidationError('Password is incorrect.')
 
 

@@ -47,7 +47,7 @@ class BotificoBot(ProtocolClient):
         # there might be that rare event when the channel password gets
         # changed *and* notifico got kicked from the channel
         self._channels[name]._password = channel.password
-        self._channels[name].message(message)
+        self._channels[name].notice(message)
 
     def will_join(self, channel):
         """

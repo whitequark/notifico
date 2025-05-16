@@ -50,5 +50,8 @@ if __name__ == '__main__':
         ],
         dependency_links=[
             'https://github.com/notifico/utopia/tarball/master#egg=utopia'
+        ],
+        scripts=[
+            'scripts/notifico'
         ]
     )

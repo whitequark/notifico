@@ -100,6 +100,11 @@ NOTIFICO_PASSWORD_RESET_EXPIRY = 60 * 60 * 24
 NOTIFICO_MAIL_SENDER = None
 
 try:
+    config_path = os.environ.get('NOTIFICO_CONFIG_PATH')
+    if config_path:
+        import imp
+        imp.load_source('local_config', config_path)
+
     from local_config import *
 except ImportError:
     pass

@@ -7,6 +7,7 @@ from flask import (
 )
 from flask_sqlalchemy import Pagination
 from sqlalchemy import func
+from sqlalchemy.sql import text
 
 from notifico import db
 from notifico.services import stats
@@ -50,7 +51,7 @@ def networks():
             func.count(Channel.channel).label('count')
         ), user=g.user)
         .group_by(Channel.host)
-        .order_by('di_count desc')
+        .order_by(text('di_count desc'))
     )
     total = q.count()
     items = q.limit(per_page).offset((page - 1) * per_page).all()

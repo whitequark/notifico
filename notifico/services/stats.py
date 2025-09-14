@@ -3,6 +3,7 @@
 A collection of utility methods for common site statistics.
 """
 from sqlalchemy import func
+from sqlalchemy.sql import text
 
 from notifico import db, cache
 from notifico.models import Project, Channel, User
@@ -51,6 +52,6 @@ def top_networks(limit=20):
             Channel.public == True
         )
         .group_by(Channel.host)
-        .order_by('count desc')
+        .order_by(text('count desc'))
         .limit(limit)
     ).all()

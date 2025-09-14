@@ -5,6 +5,7 @@ import base64
 import hashlib
 import datetime
 
+from sqlalchemy.sql import text
 from sqlalchemy.ext.hybrid import hybrid_property
 
 from notifico import db
@@ -96,7 +97,7 @@ class User(db.Model):
         """
         Return this users most active projets (by descending message count).
         """
-        q = self.projects.order_by(False).order_by('-message_count')
+        q = self.projects.order_by(False).order_by(text('-message_count'))
         q = q.limit(limit)
         return q
 

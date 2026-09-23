@@ -223,7 +223,12 @@ def _create_push_summary(project_name, j, config):
         modified=len(j['files']['modified'])
     ))
 
-    # The shortened URL linking to the compare page.
+    if 'compare' in original:
+        compare_link = original['compare']
+    else:
+        # Support Forgejo variation
+        compare_link = original['compare_url']
+    # The URL linking to the compare page.
     line.append(u'{PINK}{compare_link}{RESET}'.format(
         compare_link=compare_link,
         **HookService.colors
@@ -243,7 +248,8 @@ def _create_commit_summary(project_name, j, config):
 
     for commit in original['commits']:
         if config.get('distinct_only', True):
-            if not commit['distinct']:
+            # Forgejo doesn’t include this field
+            if 'distinct' in commit and not commit['distinct']:
                 # This commit has been seen in the repo
                 # before, skip over it and to the next one
                 continue
@@ -812,7 +818,8 @@ class GithubHook(HookService):
             ))
         elif j['branch']:
             # Verb with proper capitalization
-            if original['deleted']:
+            # Forgejo seems to only use delete events for git push -d
+            if 'deleted' in original and original['deleted']:
                 if not is_event_allowed(config, 'delete', 'branch'):
                     return ''
                 line.append(

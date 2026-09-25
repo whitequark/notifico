@@ -51,8 +51,9 @@ def simplify_payload(payload):
     # Summarize file movement over all the commits.
     for commit in payload.get('commits', tuple()):
         for type_ in ('added', 'removed', 'modified'):
-            result['files'][type_].extend(commit[type_])
-            result['files']['all'].extend(commit[type_])
+            if not commit[type_] is None:
+                result['files'][type_].extend(commit[type_])
+                result['files']['all'].extend(commit[type_])
 
     return result
 
